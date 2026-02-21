@@ -25,7 +25,7 @@
         "server/rooms.js exports createRoomManager",
         "createRoomManager() returns object with addUser/removeUser/getRoom/getRoomForSocket/getUsersArray"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-003",
