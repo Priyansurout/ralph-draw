@@ -1,0 +1,314 @@
+{
+  "branchName": "collab-draw-chat",
+  "project": "collaborative-drawing-app",
+  "description": "Real-time collaborative drawing and chat web app. Friends connect to a shared room, draw on a canvas synced via Socket.IO, and chat.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Root + server/client package.json files",
+      "description": "Create the three package.json files needed for the project. (1) Root package.json: name='collab-draw', type='module', private=true, scripts.dev = 'concurrently \"node server/index.js\" \"npm run dev --prefix client\"', devDependencies: concurrently ^8.2.0. (2) server/package.json: name='collab-draw-server', type='module', dependencies: express ^4, socket.io ^4, nanoid ^5. (3) client/package.json: name='collab-draw-client', type='module', dependencies: react ^18, react-dom ^18, socket.io-client ^4, devDependencies: vite ^5, @vitejs/plugin-react ^4, tailwindcss ^3, postcss ^8, autoprefixer ^10. Do NOT run npm install — just write the JSON files.",
+      "acceptanceCriteria": [
+        "package.json exists at root with type:module and scripts.dev using concurrently",
+        "server/package.json exists with type:module and correct dependencies",
+        "client/package.json exists with type:module and correct dependencies",
+        "No npm install performed yet"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-002",
+      "title": "server/index.js (Express + health endpoint) + server/rooms.js",
+      "description": "Create server/index.js using ES module syntax. Import express, http (createServer), and the Server class from socket.io. Create Express app, attach it to http server, attach Socket.IO to http server. Add GET /health route returning JSON {ok:true}. Start listening on port 3001. Log '[server] listening on :3001' on startup. Create server/rooms.js that exports a createRoomManager() function. The room manager must expose: addUser(roomId, socketId, nickname, color), removeUser(socketId), getRoom(roomId), getRoomForSocket(socketId), and getUsersArray(roomId). Internally use two Maps: rooms (roomId→{users:Map,chatHistory:[]}) and socketToRoom (socketId→roomId).",
+      "acceptanceCriteria": [
+        "server/index.js uses ES module imports, no require()",
+        "GET http://localhost:3001/health returns {ok:true}",
+        "server/rooms.js exports createRoomManager",
+        "createRoomManager() returns object with addUser/removeUser/getRoom/getRoomForSocket/getUsersArray"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "room:join and disconnect socket handlers (server)",
+      "description": "In server/index.js, add Socket.IO connection handler. On room:join {roomId, nickname}: (1) check if room has MAX_USERS=5 users — if full emit room:error {message:'Room is full'} and return; (2) assign color from palette ['#ef4444','#3b82f6','#22c55e','#f59e0b','#a855f7'] based on current room size; (3) call roomManager.addUser(roomId, socket.id, nickname, color); (4) socket.join(roomId); (5) emit room:joined to sender with {users: getUsersArray(roomId), chatHistory: room.chatHistory}; (6) broadcast room:user_joined {id:socket.id, nickname, color} to rest of room. On disconnect: look up roomId via getRoomForSocket, call removeUser(socket.id), broadcast room:user_left {id:socket.id, nickname} to room. Log format: console.log('[room:join]', roomId, nickname). Wrap all handlers in try/catch — on error log it, do not emit anything.",
+      "acceptanceCriteria": [
+        "room:join handler checks MAX_USERS and emits room:error if full",
+        "Joining user receives room:joined with full user list",
+        "Existing users receive room:user_joined broadcast",
+        "Disconnect triggers room:user_left broadcast to remaining users",
+        "Server logs [room:join] roomId nickname format",
+        "All handlers wrapped in try/catch"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-004",
+      "title": "draw:* event relay (server)",
+      "description": "In server/index.js, add handlers for four draw events. For draw:stroke_start {x,y,color,brushSize,tool}: look up roomId for socket, broadcast to room excluding sender via socket.to(roomId).emit('draw:stroke_start', {userId:socket.id, x, y, color, brushSize, tool}). For draw:stroke_move {x,y}: broadcast {userId:socket.id, x, y}. For draw:stroke_end {}: broadcast {userId:socket.id}. For draw:clear {}: broadcast draw:clear to room excluding sender. All wrapped in try/catch. No logging for draw events.",
+      "acceptanceCriteria": [
+        "draw:stroke_start relayed to others in room with userId added",
+        "draw:stroke_move relayed with userId added",
+        "draw:stroke_end relayed with userId",
+        "draw:clear relayed to all others in room",
+        "Sender does not receive their own draw events",
+        "All handlers wrapped in try/catch"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-005",
+      "title": "chat:message handler (server)",
+      "description": "In server/index.js, add handler for chat:message {text}. Validate: text must be a non-empty string, max 500 chars — if invalid silently return. Look up roomId and user's nickname from room state. Create message: {id: nanoid(), userId: socket.id, nickname, text: text.trim(), timestamp: Date.now()}. Append to room.chatHistory. If chatHistory.length > MAX_MESSAGES (200), trim oldest: chatHistory.splice(0, chatHistory.length - MAX_MESSAGES). Broadcast chat:message (the full message object) to entire room io.to(roomId).emit(...). Wrap in try/catch.",
+      "acceptanceCriteria": [
+        "chat:message broadcast to all users in room including sender",
+        "Message object has id (nanoid), userId, nickname, text, timestamp fields",
+        "chatHistory never exceeds 200 entries",
+        "Empty or non-string text is silently ignored",
+        "Handler wrapped in try/catch"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-006",
+      "title": "cursor:move relay (server)",
+      "description": "In server/index.js, add handler for cursor:move {x, y}. Look up roomId via getRoomForSocket(socket.id). Look up user's nickname and color from room users Map. Broadcast cursor:move {userId: socket.id, nickname, color, x, y} to all other sockets in room via socket.to(roomId).emit(). Wrap in try/catch. No logging.",
+      "acceptanceCriteria": [
+        "cursor:move received from one client relayed to others with userId/nickname/color added",
+        "Sender does NOT receive their own cursor events",
+        "Handler wrapped in try/catch"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-007",
+      "title": "Vite + React client scaffold",
+      "description": "Create the client/ folder structure: (1) client/index.html with <!DOCTYPE html>, lang='en', title='CollabDraw', a #root div, and <script type='module' src='/src/main.jsx'>. (2) client/vite.config.js: import defineConfig from vite and plugin-react; export default defineConfig with plugins:[react()] and server.proxy: {'/socket.io': {target:'http://localhost:3001', ws:true, changeOrigin:true}}. (3) client/src/main.jsx: import React, ReactDOM, App, and './index.css'; render <App/> into document.getElementById('root'). (4) client/src/App.jsx: placeholder — export default function App() { return <div className='p-4'>Loading...</div> }. Then run: cd client && npm install.",
+      "acceptanceCriteria": [
+        "client/index.html has #root div and module script",
+        "client/vite.config.js has /socket.io proxy with ws:true",
+        "client/src/main.jsx renders App",
+        "client/src/App.jsx is a valid React component",
+        "npm install in client/ completes without errors",
+        "npx vite build in client/ succeeds without errors"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-008",
+      "title": "Tailwind CSS configuration",
+      "description": "Add Tailwind CSS to the client. (1) client/tailwind.config.js: export default { content: ['./index.html','./src/**/*.{jsx,js}'], theme:{extend:{}}, plugins:[] }. (2) client/postcss.config.js: export default { plugins: { tailwindcss: {}, autoprefixer: {} } }. (3) client/src/index.css: three lines — @tailwind base; @tailwind components; @tailwind utilities; — nothing else. (4) Verify client/src/main.jsx already imports './index.css'. Update App.jsx to temporarily use className='min-h-screen bg-gray-100 flex items-center justify-center' to verify Tailwind works. Run npm install from client/ if tailwindcss is not yet installed.",
+      "acceptanceCriteria": [
+        "client/tailwind.config.js exists with correct content array",
+        "client/postcss.config.js exists",
+        "client/src/index.css has only @tailwind directives",
+        "main.jsx imports index.css",
+        "npx vite build in client/ succeeds"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-009",
+      "title": "App.jsx session state and routing",
+      "description": "Implement client/src/App.jsx with full session state using useState. State variables: sessionState (default 'join'), roomId (default ''), nickname (default ''), myColor (default ''), myId (default ''), users (default []), chatMessages (default []), joinError (default null). When sessionState === 'join', render <JoinScreen onJoin={handleJoin} joinError={joinError} />. When sessionState === 'room', render <Room socket={socket} roomId={roomId} nickname={nickname} myColor={myColor} myId={myId} users={users} chatMessages={chatMessages} />. handleJoin(roomId, nickname) sets state and triggers socket connection. Import JoinScreen and Room (create as empty placeholder files if needed). Use function declaration: export default function App().",
+      "acceptanceCriteria": [
+        "App.jsx has all 8 state variables with useState",
+        "Renders JoinScreen when sessionState is 'join'",
+        "Renders Room when sessionState is 'room'",
+        "Function declaration syntax used",
+        "No console.log statements",
+        "npx vite build succeeds"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-010",
+      "title": "JoinScreen component",
+      "description": "Create client/src/components/JoinScreen.jsx. Props: onJoin(roomId, nickname), joinError (string|null). Render a centered full-screen div (min-h-screen flex items-center justify-center bg-gray-50). Inside: a card div with a title 'CollabDraw', two labeled text inputs (Room ID, Nickname), a Join button. On form submit: if either field is empty do nothing; otherwise call onJoin(roomId.trim(), nickname.trim()). If joinError is non-null, show it in a red text paragraph above the button. Styled entirely with Tailwind. export default function JoinScreen({ onJoin, joinError }).",
+      "acceptanceCriteria": [
+        "Form renders Room ID input, Nickname input, and Join button",
+        "Empty field submission does nothing (no onJoin call)",
+        "Valid submission calls onJoin with trimmed values",
+        "joinError displays as red text when prop is non-null",
+        "Tailwind only — no custom CSS",
+        "Function declaration syntax",
+        "No console.log"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-011",
+      "title": "useSocket hook",
+      "description": "Create client/src/hooks/useSocket.js. Named export: export function useSocket({ roomId, nickname, onJoined, onUserJoined, onUserLeft, onDrawEvent, onChatMessage, onCursorMove, onError }). Use useEffect with [roomId, nickname] as dependencies. Only connect if both roomId and nickname are truthy. Import io from 'socket.io-client'. Create socket: const socket = io(). Emit room:join {roomId, nickname} after connecting. Register event listeners: room:joined → onJoined, room:user_joined → onUserJoined, room:user_left → onUserLeft, draw:stroke_start/move/end/clear → onDrawEvent with event name + payload, chat:message → onChatMessage, cursor:move → onCursorMove, room:error → onError. Keep socket in a ref so it's stable. Return {socket: socketRef.current, isConnected}. Cleanup: socket.disconnect(). No console.log.",
+      "acceptanceCriteria": [
+        "Socket only connects when both roomId and nickname are truthy",
+        "All room:*, draw:*, chat:message, cursor:move events registered",
+        "Cleanup disconnects socket",
+        "Returns {socket, isConnected}",
+        "Named export function declaration",
+        "No console.log"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-012",
+      "title": "Connect App.jsx to useSocket + sounds",
+      "description": "Update App.jsx to use the real useSocket hook. Call useSocket({ roomId, nickname, onJoined, onUserJoined, onUserLeft, onDrawEvent, onChatMessage, onCursorMove, onError }). Implement callbacks: onJoined({users, chatHistory, myColor, myId}) → setSessionState('room'), setUsers(users), setChatMessages(chatHistory), setMyColor(myColor), setMyId(socket.id); onUserJoined(user) → setUsers(prev => [...prev, user]) + playJoin(); onUserLeft({id}) → setUsers(prev => prev.filter(u => u.id !== id)) + playLeave(); onChatMessage(msg) → setChatMessages(prev => [...prev.slice(-199), msg]) + playMessage(); onError({message}) → setJoinError(message). Import {playJoin, playLeave, playMessage} from './utils/sounds'. Store draw events for DrawingCanvas via a ref or callback (onDrawEvent will be passed down). Pass socket to Room.",
+      "acceptanceCriteria": [
+        "useSocket called with all callbacks",
+        "onJoined transitions to room state and sets user list",
+        "onUserJoined/Left update users array",
+        "onChatMessage appends and caps at 200",
+        "onError sets joinError",
+        "Sounds play on user join/leave/message",
+        "No console.log"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-013",
+      "title": "sounds.js (Web Audio API)",
+      "description": "Create client/src/utils/sounds.js. No imports from node_modules. Export three named functions: export function playJoin() — plays a short ascending two-note tone (e.g., 440Hz then 550Hz, 80ms each) using AudioContext + OscillatorNode + GainNode. export function playLeave() — plays a short descending tone (e.g., 440Hz then 350Hz). export function playMessage() — plays a brief click (short 880Hz tone, 50ms). Each function: create AudioContext, create oscillator, connect to gain, connect to destination, set frequency, start, stop after duration. Wrap entire function in try{}catch(e){} so audio errors are always silent.",
+      "acceptanceCriteria": [
+        "sounds.js exports playJoin, playLeave, playMessage",
+        "Each uses Web Audio API (no audio files)",
+        "All errors caught silently",
+        "No console.log",
+        "No imports from node_modules"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-014",
+      "title": "useDrawing hook",
+      "description": "Create client/src/hooks/useDrawing.js. Named export: export function useDrawing(). Internal state: tool('brush'), color('#000000'), brushSize(6), isDrawing(false). Keep activeStrokes Map (userId→{color,brushSize,tool}) in a ref for tracking remote strokes. Returns: {canvasRef (useRef), tool, color, brushSize, setTool, setColor, setBrushSize, startStroke(ctx,x,y), moveStroke(ctx,x,y), endStroke(ctx), clearCanvas(ctx), drawRemoteStart(ctx,{userId,x,y,color,brushSize,tool}), drawRemoteMove(ctx,{userId,x,y}), drawRemoteEnd(userId)}. startStroke: set isDrawing=true, store in activeStrokes for local ('local' key), beginPath, moveTo(x,y). moveStroke: if isDrawing, lineTo(x,y), stroke. Apply compositing before each stroke: source-over for brush, destination-out for eraser. clearCanvas: ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT). Remote functions mirror local but use the userId's stored stroke state.",
+      "acceptanceCriteria": [
+        "useDrawing returns all specified functions and state",
+        "canvasRef is a useRef suitable for attaching to <canvas>",
+        "Brush uses source-over compositing",
+        "Eraser uses destination-out compositing",
+        "Remote draw functions track per-userId stroke state",
+        "Named export function declaration",
+        "No console.log"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-015",
+      "title": "DrawingCanvas component",
+      "description": "Create client/src/components/DrawingCanvas.jsx. Props: socket, drawingHook (the returned object from useDrawing()). Render: <canvas ref={drawingHook.canvasRef} width={1280} height={720} className='block bg-white cursor-crosshair' style={{touchAction:'none'}} />. Mouse handlers (attach to canvas): onMouseDown: get ctx = canvas.getContext('2d'), call drawingHook.startStroke(ctx,x,y), emit draw:stroke_start {x,y,color:drawingHook.color, brushSize:drawingHook.brushSize, tool:drawingHook.tool}. onMouseMove: if isDrawing: throttle to 16ms via lastStrokeTime ref, call drawingHook.moveStroke(ctx,x,y), emit draw:stroke_move {x,y}. Always: throttle cursor to 50ms via lastCursorTime ref, emit cursor:move {x,y}. onMouseUp: call drawingHook.endStroke(ctx), emit draw:stroke_end {}. useEffect listening to socket draw:* events → drawingHook.drawRemote*(ctx,...). isDrawing tracked via ref.",
+      "acceptanceCriteria": [
+        "Canvas is 1280x720 with white background",
+        "mousedown starts stroke and emits draw:stroke_start",
+        "mousemove emits draw:stroke_move at max 60fps (16ms throttle)",
+        "cursor:move emitted at max 20fps (50ms throttle)",
+        "Remote draw events render via drawRemote* functions",
+        "Function declaration syntax",
+        "No console.log"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-016",
+      "title": "Toolbar component (color, brush size, eraser, clear)",
+      "description": "Create client/src/components/Toolbar.jsx. Props: tool, color, brushSize, setTool, setColor, setBrushSize, onClear, socket. Render a horizontal toolbar: (1) label + color input type='color' value={color} onChange={e=>setColor(e.target.value)}; (2) label + range input min=2 max=40 value={brushSize} onChange={e=>setBrushSize(Number(e.target.value))}; (3) 'Brush' button — onClick setTool('brush'), visually active (ring-2 ring-blue-500) when tool==='brush'; (4) 'Eraser' button — onClick setTool('eraser'), active when tool==='eraser'; (5) 'Clear' button — onClick calls onClear() then socket.emit('draw:clear'). Style with Tailwind: flex gap-4 items-center p-2 bg-white border-b.",
+      "acceptanceCriteria": [
+        "Color picker changes drawing color",
+        "Brush size slider changes brush size (2-40)",
+        "Brush/Eraser buttons toggle tool with visual active state",
+        "Clear calls onClear and emits draw:clear via socket",
+        "Tailwind only — no custom CSS",
+        "Function declaration syntax",
+        "No console.log"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-017",
+      "title": "ChatPanel component",
+      "description": "Create client/src/components/ChatPanel.jsx. Props: socket, messages (array), nickname, myColor. Render a flex-col container with: (1) scrollable message list — use useRef+useEffect to auto-scroll to bottom whenever messages changes; each message renders nickname in user's color (inline style for dynamic color), message text, and timestamp (new Date(timestamp).toLocaleTimeString()); (2) input area at bottom — text input (max 500 chars) + Send button. On send: if text is empty do nothing; emit chat:message {text: input.trim()}; clear input. Enter key also triggers send. Tailwind styling. Function declaration: export default function ChatPanel({socket, messages, nickname, myColor}).",
+      "acceptanceCriteria": [
+        "Message list auto-scrolls to bottom on new messages",
+        "Each message shows nickname in user's color, text, and formatted time",
+        "Send button and Enter key both send messages",
+        "Input clears after send",
+        "Empty message not sent",
+        "Emits chat:message {text} via socket",
+        "Function declaration syntax",
+        "No console.log"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-018",
+      "title": "UserList sidebar component",
+      "description": "Create client/src/components/UserList.jsx. Props: users (array of {id, nickname, color}), myId (string). Render a vertical panel with: (1) heading showing 'N / 5 users' where N = users.length; (2) list of users — each showing a small colored circle dot (w-3 h-3 rounded-full inline-block mr-2, with style={{backgroundColor:user.color}}) and the nickname, plus ' (you)' appended if user.id === myId. Tailwind styling: bg-white border-l p-3 flex flex-col gap-2. Function declaration: export default function UserList({users, myId}).",
+      "acceptanceCriteria": [
+        "Shows 'N / 5 users' count",
+        "Each user has a colored dot matching their color",
+        "Current user is labeled (you)",
+        "Updates reactively when users prop changes",
+        "Function declaration syntax",
+        "No console.log"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-019",
+      "title": "CursorOverlay component",
+      "description": "Create client/src/components/CursorOverlay.jsx. Props: socket, myId. Internal state: cursors (object/Map mapping userId→{nickname,color,x,y,lastSeen}). useEffect: listen to socket cursor:move events — on event, update cursors state with {nickname,color,x,y,lastSeen:Date.now()}. Also run a setInterval every 500ms to remove cursors where Date.now()-lastSeen > 2000 (CURSOR_FADE_TIMEOUT). Cleanup both on unmount. Render: a div with position:absolute (or className='absolute'), top-0, left-0, width=1280, height=720, pointer-events:none, overflow:hidden. Inside: for each cursor (excluding myId), render a small label div with position:absolute, left=cursor.x, top=cursor.y, the nickname in the user's color, small text. Function declaration: export default function CursorOverlay({socket, myId}).",
+      "acceptanceCriteria": [
+        "Renders cursor labels for all remote users at correct positions",
+        "Cursor labels disappear after 2000ms of inactivity",
+        "Overlay has pointer-events:none (does not block canvas)",
+        "Overlay is 1280x720 (matches canvas exactly)",
+        "Does not render current user's own cursor",
+        "Function declaration syntax",
+        "No console.log"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-020",
+      "title": "Room.jsx layout (assembles all components)",
+      "description": "Create client/src/components/Room.jsx. Props: socket, roomId, nickname, myColor, myId, users, chatMessages. Call useDrawing() inside this component. Compose the full room UI with Tailwind flex layout: outer div h-screen flex flex-col. Top bar: <Toolbar tool={...} color={...} brushSize={...} setTool={...} setColor={...} setBrushSize={...} onClear={()=>drawingHook.clearCanvas(ctx)} socket={socket} />. Main area: flex flex-row flex-1 overflow-hidden. Center: relative div containing <DrawingCanvas socket={socket} drawingHook={drawingHook} /> and <CursorOverlay socket={socket} myId={myId} /> stacked (overlay is absolute). Right sidebar: flex flex-col with <UserList users={users} myId={myId} /> on top and <ChatPanel socket={socket} messages={chatMessages} nickname={nickname} myColor={myColor} /> below. Import all components. Function declaration: export default function Room({...}).",
+      "acceptanceCriteria": [
+        "Room renders Toolbar, DrawingCanvas, CursorOverlay, UserList, ChatPanel",
+        "useDrawing called inside Room",
+        "DrawingCanvas receives drawingHook prop",
+        "Toolbar receives drawing state/setters",
+        "CursorOverlay is absolutely positioned over canvas",
+        "Layout holds together with Tailwind",
+        "Function declaration syntax",
+        "No console.log"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-021",
+      "title": "npm install + dev server smoke test",
+      "description": "Run npm install from three directories: (1) root (installs concurrently), (2) server/ (installs express, socket.io, nanoid), (3) client/ (installs all client deps). Fix any package.json errors, missing deps, or version conflicts found during install. Then verify: run node server/index.js and confirm it starts without errors, GET http://localhost:3001/health returns {ok:true}. Fix any server startup errors. Then run npm run dev from root and confirm both server and client start. Open browser at http://localhost:5173 and confirm JoinScreen renders without browser console errors. Fix any import errors, missing modules, or config issues found during this verification.",
+      "acceptanceCriteria": [
+        "npm install succeeds in root, server/, and client/ without errors",
+        "node server/index.js starts and responds to GET /health with {ok:true}",
+        "npm run dev from root starts both server (3001) and client (5173)",
+        "Browser at localhost:5173 shows JoinScreen",
+        "No unhandled errors in browser console or server terminal"
+      ],
+      "passes": false
+    },
+    {
+      "id": "US-022",
+      "title": "End-to-end integration: two users draw and chat",
+      "description": "With npm run dev running, open two browser tabs both at http://localhost:5173. Tab 1: enter roomId='testroom', nickname='Alice', click Join. Tab 2: enter roomId='testroom', nickname='Bob', click Join. Verify: (1) both tabs show both users in UserList; (2) drawing strokes on Tab 1 appear on Tab 2 in real time; (3) typing and sending a chat message on Tab 1 appears on Tab 2; (4) moving mouse over canvas on Tab 1 shows a cursor label on Tab 2. Fix any remaining bugs in socket event wiring, canvas rendering, state synchronization, or component prop passing. Common issues to check: socket not passed to all components that need it, drawingHook.canvasRef not attached, onDrawEvent not wired through to DrawingCanvas, chat messages not rendering with correct color.",
+      "acceptanceCriteria": [
+        "Two users can join the same room simultaneously",
+        "Both users see each other in UserList",
+        "Drawing on one tab syncs to the other in real time",
+        "Chat messages from one tab appear on the other",
+        "Cursor label for remote user appears on canvas",
+        "No unhandled errors in browser console or server terminal"
+      ],
+      "passes": false
+    }
+  ]
+}

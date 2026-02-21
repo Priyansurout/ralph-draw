@@ -1,0 +1,14 @@
+{
+  "name": "collab-draw",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"node server/index.js\" \"npm run dev --prefix client\"",
+    "start:server": "node server/index.js",
+    "start:client": "npm run dev --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
