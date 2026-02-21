@@ -10,6 +10,12 @@ All package.json files use `"type": "module"` to enable ES module imports. Sub-p
 ### ES Module Compatibility
 `nanoid ^5` is pure ESM — must use `^5` (not v3/v4 which are CJS). Server and client socket.io packages must share the same major version to ensure protocol compatibility.
 
+### Server Entry Point Pattern
+`server/index.js` uses `createServer(app)` from Node's `http` built-in (NOT `app.listen()`) so Socket.IO and Express share the same port. `new Server(httpServer, { cors: { origin: 'http://localhost:5173' } })` restricts CORS to the Vite dev origin. `roomManager` is created at module scope (not inside connection handler) so all socket handlers close over it. Relative imports must use `.js` extension: `import { createRoomManager } from './rooms.js'`.
+
+### Room Manager Pattern
+`createRoomManager()` is a factory function returning a plain object. Two Maps: `rooms` (roomId→{users:Map,chatHistory:[]}) and `socketToRoom` (socketId→roomId). `removeUser` deletes the `socketToRoom` entry first before checking roomId (defensive against double-disconnect). Empty rooms are deleted when last user leaves. `getUsersArray` returns `Array.from(room.users.values())` — a fresh snapshot array.
+
 ---
 
 ## [2026-02-22] - US-001: Root + server/client package.json files
@@ -22,4 +28,16 @@ All package.json files use `"type": "module"` to enable ES module imports. Sub-p
   - Plan agents do not write files to disk — main agent must write plan files itself and then spawn evaluator
   - Root package.json was bootstrapped before iteration 1 began; always check before overwriting
   - socket.io-client is a runtime dep (dependencies), not devDependency
+---
+
+## [2026-02-22] - US-002: server/index.js (Express + health endpoint) + server/rooms.js
+- Plan chosen: B
+- Reason: Plan B uses SERVER_PORT constant (matches PROJECT.md), explicit CORS origin (http://localhost:5173 not '*'), and defensive removeUser that clears socketToRoom first. Plan C disqualified for speculative export { io, roomManager } beyond US-002 scope.
+- Files created: server/index.js, server/rooms.js, server/package-lock.json
+- Files modified: (none beyond new files)
+- Implementation notes: server/index.js uses createServer(app) pattern for Socket.IO sharing. roomManager instantiated at module scope. Empty io.on('connection') stub scaffolded for US-003. npm install run in server/ to verify startup. GET /health confirmed returning {ok:true}.
+- Learnings for future iterations:
+  - Evaluator agents also cannot write files — main agent must write chosen_plan.md itself from the evaluator's output
+  - Relative ESM imports require .js extension: './rooms.js' not './rooms'
+  - CORS must be configured in Socket.IO Server constructor, not Express middleware
 ---
