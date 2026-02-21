@@ -13,7 +13,7 @@
         "client/package.json exists with type:module and correct dependencies",
         "No npm install performed yet"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-002",
