@@ -1,0 +1,25 @@
+# Ralph Progress Log
+Started: Sun Feb 22 01:01:21 AM IST 2026
+---
+
+## Codebase Patterns
+
+### Package.json Structure
+All package.json files use `"type": "module"` to enable ES module imports. Sub-packages omit `private: true` (root only). Caret (`^`) version specifiers used throughout. `socket.io-client` belongs in `dependencies` (runtime), not `devDependencies`. `react` and `react-dom` must share identical version strings.
+
+### ES Module Compatibility
+`nanoid ^5` is pure ESM — must use `^5` (not v3/v4 which are CJS). Server and client socket.io packages must share the same major version to ensure protocol compatibility.
+
+---
+
+## [2026-02-22] - US-001: Root + server/client package.json files
+- Plan chosen: B
+- Reason: Most current stable versions, includes client scripts block for root dev command, documents non-obvious constraints (react/react-dom parity, socket.io version alignment)
+- Files created: server/package.json, client/package.json
+- Files modified: TODO.md, PROGRESS.md
+- Implementation notes: Root package.json already existed and was correct. Only created server/ and client/ sub-package manifests. Client gets dev/build/preview scripts so root `npm run dev --prefix client` resolves.
+- Learnings for future iterations:
+  - Plan agents do not write files to disk — main agent must write plan files itself and then spawn evaluator
+  - Root package.json was bootstrapped before iteration 1 began; always check before overwriting
+  - socket.io-client is a runtime dep (dependencies), not devDependency
+---
