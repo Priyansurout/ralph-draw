@@ -2,15 +2,15 @@
 
 ## Current State
 
-current_task: US-001
-last_completed: none
-status: not_started
+current_task: US-002
+last_completed: US-001
+status: in_progress
 
 ## TASK STATUS TABLE
 
 | Task   | Title                                           | Status  |
 |--------|-------------------------------------------------|---------|
-| US-001 | Root + server/client package.json files         | pending |
+| US-001 | Root + server/client package.json files         | done    |
 | US-002 | server/index.js (Express + health) + rooms.js   | pending |
 | US-003 | room:join / room:leave socket handlers          | pending |
 | US-004 | draw:* event relay (server)                     | pending |
@@ -39,4 +39,4 @@ status: not_started
 
 ## COMPLETED LOG
 
-(none yet)
+[2026-02-22] US-001 done — created server/package.json and client/package.json

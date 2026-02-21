@@ -1,7 +1,7 @@
 # TODO.md — Task Definitions
 
 ### US-001
-status: pending
+status: done
 depends_on: none
 action: Create root package.json (type:module, scripts.dev with concurrently), server/package.json (type:module, deps: express socket.io nanoid), client/package.json (type:module, deps: react react-dom, devDeps: vite @vitejs/plugin-react socket.io-client tailwindcss postcss autoprefixer). Do NOT run npm install.
 files: package.json, server/package.json, client/package.json
